@@ -3,12 +3,12 @@ from json import loads
 from dotenv import load_dotenv
 import os
 from azure.storage.blob import BlobServiceClient
-import json
-import datetime  
+
 
 # IP value
 load_dotenv()
 ip = os.getenv("IP")
+
 
 # Create a Kafka consumer
 consumer = KafkaConsumer(
@@ -25,75 +25,60 @@ connection_string = os.getenv("CONN_STRING")
 # Create a BlobServiceClient using the Azure Storage connection string
 blob_service_client = BlobServiceClient.from_connection_string(connection_string)
 
-# last update
-# save all data
-for message in consumer:
-    trending_repos = message.value
 
-    blob_name = "trending_repos_input.json"
 
-    # Create a BlobClient to get the existing blob's content
-    existing_blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
 
+
+def delete_blob_content(blob_name):
+    blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
+    
+    # Upload an empty string to the blob, effectively deleting its content
+    blob_client.upload_blob("", overwrite=True)
+    
+    print(f"Content of '{blob_name}' deleted.")
+
+# Function to upload CSV data to Blob Storage
+def upload_csv_to_blob(csv_data, blob_name):
+    csv_blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
+    
     try:
-        # Download the existing content of the blob
-        existing_blob_data = existing_blob_client.download_blob().readall()
+        # Download the existing CSV content of the blob
+        existing_csv_data = csv_blob_client.download_blob().readall().decode("utf-8")
 
-        # Convert the existing content from bytes to a string (assuming it's a JSON object)
-        existing_json_data = existing_blob_data.decode("utf-8")
-
-        # Convert existing JSON data to a Python dictionary
-        existing_data_dict = json.loads(existing_json_data)
+        if (existing_csv_data == ''):
+            # If the blob is empty, initialize with header
+            header = "name,owner,description,language,stars,forks,score,date_score"
+            updated_csv_data = header + '\n' + '\n'.join(csv_data)
+        else:
+            # Append new data to existing CSV data
+            updated_csv_data = existing_csv_data + '\n' + '\n'.join(csv_data)
     except:
-        # If the blob doesn't exist or can't be read, initialize with an empty dictionary
-        existing_data_dict = {}
+        # If the blob doesn't exist or can't be read, initialize with header
+        header = "name,owner,description,language,stars,forks,score,date_score"
+        updated_csv_data = header + '\n' + '\n'.join(csv_data)
 
-    # Generate a new unique key based on the current date and time
-    current_datetime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    trending_repos_with_timestamp = {current_datetime: trending_repos}
+    # Upload the updated CSV data to the blob, overwriting the existing blob
+    csv_blob_client.upload_blob(updated_csv_data, overwrite=True)
 
-    # Merge the new data with the existing data
-    updated_data_dict = {**existing_data_dict, **trending_repos_with_timestamp}
+    print("Trending repos data appended and saved as CSV to Azure Storage.")
 
-    # Convert the updated dictionary back to a JSON string
-    updated_json_data = json.dumps(updated_data_dict, indent=4)  # Indent for better readability
 
-    # Upload the updated JSON string to the blob, overwriting the existing blob
-    blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
-    blob_client.upload_blob(updated_json_data, overwrite=True)
-
-    print("Trending repos data appended and saved to Azure Storage.")
-
-    blob_name = "2day_trending_repos_input.json"
-
-    # Convert the new data to a dictionary with a single key for the current date
-    current_day = datetime.datetime.now().strftime("%Y-%m-%d")
-    new_data = {current_day: trending_repos}
-
-    # Convert the new data dictionary to a JSON string
-    new_json_data = json.dumps(new_data, indent=4)  # Indent for better readability
-
-    # Upload the new JSON string to the blob, overwriting the existing blob
-    blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
-    blob_client.upload_blob(new_json_data, overwrite=True)
-    print("Trending repos data added and saved to Azure Storage.")
-
-# save 2days data
+# Save CSV data
+csv_data = []
+delete_blob_content("2day_trending_repos_input.csv")
 
 for message in consumer:
     trending_repos = message.value
 
-    blob_name = "2day_trending_repos_input.json"
+    # Prepare CSV data for this message
+    csv_data.append(','.join(map(str, trending_repos.values())))
 
-    # Convert the new data to a dictionary with a single key for the current date
-    current_day = datetime.datetime.now().strftime("%Y-%m-%d")
-    new_data = {current_day: trending_repos}
+    # Upload CSV data to Blob Storage
+    blob_name = "trending_repos_input.csv"
+    blob_name_2day = "2day_trending_repos_input.csv"
+    upload_csv_to_blob(csv_data, blob_name)
+    upload_csv_to_blob(csv_data, blob_name_2day)
+    
+    # Clear the csv_data list to avoid duplication
+    csv_data = []
 
-    # Convert the new data dictionary to a JSON string
-    new_json_data = json.dumps(new_data, indent=4)  # Indent for better readability
-
-    # Upload the new JSON string to the blob, overwriting the existing blob
-    blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
-    blob_client.upload_blob(new_json_data, overwrite=True)
-
-    print("Trending repos data updated and saved to Azure Storage.")

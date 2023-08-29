@@ -1,3 +1,4 @@
+import datetime
 import requests
 from dotenv import load_dotenv
 import os
@@ -6,7 +7,7 @@ import os
 def extractTrendingRepos():
     load_dotenv()
     # GitHub personal access token
-    githubToken = os.getenv("GITHUB_TOKEN")
+    githubToken = os.getenv("GITHUB_TOKEN2")
 
 
     # API endpoint URL for searching repositories
@@ -31,6 +32,7 @@ def extractTrendingRepos():
     # Fetch repositories using the GitHub API
     response = requests.get(url, headers=headers, params=params)
     data = response.json()
+    current_datetime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # Process and calculate trendiness scores
     trending_repositories = []
@@ -63,7 +65,8 @@ def extractTrendingRepos():
                 "language": language,
                 "stars": stars,
                 "forks": forks,
-                "trendiness_score": trendiness_score
+                "trendiness_score": trendiness_score,
+                "score_datetime": current_datetime
             })
         except Exception as ex:
             print(ex)
