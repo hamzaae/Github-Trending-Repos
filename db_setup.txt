@@ -1,0 +1,25 @@
+# DataFrameRatio.csv
+CREATE TABLE repos_with_ratio (
+    name VARCHAR(100),
+    owner VARCHAR(100),
+    description VARCHAR(255),
+    language VARCHAR(50),
+    stars INT,
+    forks INT,
+    score DECIMAL,
+    date_score VARCHAR(30),
+    forks_to_stars_ratio DECIMAL
+);
+
+# RankedDataFrame.csv
+CREATE TABLE group_ranked_repos (
+    name VARCHAR(100),
+    owner VARCHAR(100),
+    description VARCHAR(255),
+    language VARCHAR(50),
+    stars INT,
+    forks INT,
+    score DECIMAL,
+    date_score VARCHAR(30),
+    rank_within_group INT
+);
